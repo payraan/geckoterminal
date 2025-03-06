@@ -51,49 +51,19 @@ async def get_trending_networks(
     """
     Get currently trending blockchain networks
     """
-    result = await fetch_from_geckoterminal("/networks/trending")
-    
-    # Limit the number of networks returned
-    if "data" in result and isinstance(result["data"], list):
-        result["data"] = result["data"][:min(limit, 100)]
-    
-    return result
+    try:
+        result = await fetch_from_geckoterminal("/networks/trending")
+        
+        # Limit the number of networks returned
+        if "data" in result and isinstance(result["data"], list):
+            result["data"] = result["data"][:min(limit, 100)]
+        
+        return result
+    except Exception as e:
+        print(f"Error in get_trending_networks: {str(e)}")
+        raise
 
-# 2️⃣ Search for networks
-@app.get("/networks/search")
-async def search_networks(
-    query: str = Query(..., description="Network name or ID to search for"),
-    limit: Optional[int] = Query(10, description="Number of results to return (max 100)")
-):
-    """
-    Search for networks by name or ID
-    """
-    params = {"query": query}
-    result = await fetch_from_geckoterminal("/networks/search", params)
-    
-    # Limit the number of networks returned
-    if "data" in result and isinstance(result["data"], list):
-        result["data"] = result["data"][:min(limit, 100)]
-    
-    return result
-
-# 3️⃣ Get pools for a specific network
-@app.get("/networks/{network_id}/pools")
-async def get_network_pools(
-    network_id: str,
-    limit: Optional[int] = Query(10, description="Number of results to return (max 100)"),
-    page: Optional[int] = Query(1, description="Page number for pagination")
-):
-    """
-    Get pools for a specific blockchain network
-    """
-    params = {
-        "page": page,
-        "limit": limit
-    }
-    return await fetch_from_geckoterminal(f"/networks/{network_id}/pools", params)
-
-# 4️⃣ Get tokens for a specific network
+# 2️⃣ Get tokens for a specific network
 @app.get("/networks/{network_id}/tokens")
 async def get_network_tokens(
     network_id: str,
@@ -103,69 +73,29 @@ async def get_network_tokens(
     """
     Get tokens for a specific blockchain network
     """
-    params = {
-        "page": page,
-        "limit": limit
-    }
-    return await fetch_from_geckoterminal(f"/networks/{network_id}/tokens", params)
+    try:
+        params = {
+            "page": page,
+            "limit": limit
+        }
+        result = await fetch_from_geckoterminal(f"/networks/{network_id}/tokens", params)
+        return result
+    except Exception as e:
+        print(f"Error in get_network_tokens: {str(e)}")
+        raise
 
-# 5️⃣ Get top tokens by volume
-@app.get("/networks/{network_id}/tokens/top")
-async def get_top_tokens_by_volume(
-    network_id: str,
-    limit: Optional[int] = Query(10, description="Number of results to return (max 100)"),
-    period: Optional[str] = Query("h24", description="Time period (h1, h6, h24, d7)")
-):
-    """
-    Get top tokens by trading volume for a specific network
-    """
-    params = {
-        "limit": limit,
-        "period": period
-    }
-    return await fetch_from_geckoterminal(f"/networks/{network_id}/tokens/top", params)
-
-# 6️⃣ Get specific token details
-@app.get("/networks/{network_id}/tokens/{token_address}")
-async def get_token_details(
-    network_id: str,
-    token_address: str
-):
-    """
-    Get detailed information about a specific token
-    """
-    return await fetch_from_geckoterminal(f"/networks/{network_id}/tokens/{token_address}")
-
-# 7️⃣ Get pools for a specific token
-@app.get("/networks/{network_id}/tokens/{token_address}/pools")
-async def get_token_pools(
-    network_id: str,
-    token_address: str,
-    limit: Optional[int] = Query(10, description="Number of results to return (max 100)"),
-    page: Optional[int] = Query(1, description="Page number for pagination")
-):
-    """
-    Get pools for a specific token on a network
-    """
-    params = {
-        "page": page,
-        "limit": limit
-    }
-    return await fetch_from_geckoterminal(f"/networks/{network_id}/tokens/{token_address}/pools", params)
-
-# 8️⃣ Get supported networks
-@app.get("/networks")
-async def get_supported_networks(
-    limit: Optional[int] = Query(100, description="Number of results to return")
-):
-    """
-    Get a list of all supported networks
-    """
-    params = {"limit": limit}
-    return await fetch_from_geckoterminal("/networks", params)
+# Additional endpoints from previous implementation can be added here
 
 # Run the server
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8089))  # Using port 8087 to avoid conflicts with other APIs
-    print(f"🚀 Starting GeckoTerminal API server on port {port}...")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    port = int(os.getenv("PORT", 8089))  # Use PORT from environment or default to 8089
+    host = os.getenv("HOST", "0.0.0.0")
+    
+    print(f"🚀 Starting GeckoTerminal API server on {host}:{port}")
+    
+    uvicorn.run(
+        "main:app", 
+        host=host, 
+        port=port, 
+        reload=True  # Enable auto-reload for development
+    )
