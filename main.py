@@ -5,97 +5,117 @@ import uvicorn
 from typing import Optional, List, Dict, Any
 
 app = FastAPI(
-    title="GeckoTerminal API",
-    description="API for retrieving DeFi data including DEX pairs, tokens, and market information",
+    title="GeckoTerminal API V2",
+    description="API wrapper for GeckoTerminal Public API V2",
     version="1.0.0"
 )
 
 BASE_URL = "https://api.geckoterminal.com/api/v2"
-
-@app.get("/")
-def home():
-    return {"message": "✅ GeckoTerminal API is running!", "version": "1.0.0"}
+API_VERSION = "20230302"
 
 # Helper function to send requests to GeckoTerminal
-async def fetch_from_geckoterminal(endpoint: str, params: Optional[Dict[str, Any]] = None):
+def fetch_from_geckoterminal(endpoint: str, params: Optional[Dict[str, Any]] = None):
     url = f"{BASE_URL}{endpoint}"
     
-    print(f"🔍 Sending request to: {url}")
-    print(f"🔍 With params: {params}")
+    headers = {
+        "Accept": f"application/json;version={API_VERSION}",
+        "User-Agent": "GeckoTerminal-API-Wrapper/1.0"
+    }
     
     try:
-        response = requests.get(url, params=params)
-        
-        print(f"✅ Response status: {response.status_code}")
+        response = requests.get(url, params=params, headers=headers)
         
         if response.status_code == 200:
             return response.json()
-        elif response.status_code == 400:
-            print(f"❌ Bad Request: {response.text}")
-            raise HTTPException(status_code=400, detail=f"❌ Bad Request: {response.text}")
-        elif response.status_code == 429:
-            print(f"❌ Too Many Requests: {response.text}")
-            raise HTTPException(status_code=429, detail="❌ Rate limit exceeded. Please try again later.")
         else:
-            print(f"⚠ Unexpected Error: {response.text}")
-            raise HTTPException(status_code=response.status_code, detail=f"⚠ Unexpected Error: {response.text[:200]}")
+            response.raise_for_status()
     except requests.RequestException as e:
-        print(f"❌ Request error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"❌ Connection Error: {str(e)}")
+        raise HTTPException(status_code=response.status_code, detail=str(e))
 
-# 1️⃣ Get trending networks
-@app.get("/networks/trending")
-async def get_trending_networks(
-    limit: Optional[int] = Query(10, description="Number of results to return (max 100)")
+@app.get("/")
+def home():
+    return {
+        "message": "✅ GeckoTerminal API V2 Wrapper is running!",
+        "version": "1.0.0",
+        "api_version": API_VERSION
+    }
+
+@app.get("/networks")
+def get_supported_networks():
+    """
+    Get list of supported networks
+    """
+    return fetch_from_geckoterminal("/networks")
+
+@app.get("/networks/{network}/dexes")
+def get_network_dexes(network: str):
+    """
+    Get list of supported dexes on a specific network
+    """
+    return fetch_from_geckoterminal(f"/networks/{network}/dexes")
+
+@app.get("/networks/trending_pools")
+def get_trending_pools(
+    limit: Optional[int] = Query(10, description="Number of trending pools to return")
 ):
     """
-    Get currently trending blockchain networks
+    Get trending pools across all networks
     """
-    try:
-        result = await fetch_from_geckoterminal("/networks/trending")
-        
-        # Limit the number of networks returned
-        if "data" in result and isinstance(result["data"], list):
-            result["data"] = result["data"][:min(limit, 100)]
-        
-        return result
-    except Exception as e:
-        print(f"Error in get_trending_networks: {str(e)}")
-        raise
+    params = {"limit": limit}
+    return fetch_from_geckoterminal("/networks/trending_pools", params)
 
-# 2️⃣ Get tokens for a specific network
-@app.get("/networks/{network_id}/tokens")
-async def get_network_tokens(
-    network_id: str,
-    limit: Optional[int] = Query(10, description="Number of results to return (max 100)"),
-    page: Optional[int] = Query(1, description="Page number for pagination")
+@app.get("/networks/{network}/trending_pools")
+def get_network_trending_pools(
+    network: str,
+    limit: Optional[int] = Query(10, description="Number of trending pools to return")
 ):
     """
-    Get tokens for a specific blockchain network
+    Get trending pools on a specific network
     """
-    try:
-        params = {
-            "page": page,
-            "limit": limit
-        }
-        result = await fetch_from_geckoterminal(f"/networks/{network_id}/tokens", params)
-        return result
-    except Exception as e:
-        print(f"Error in get_network_tokens: {str(e)}")
-        raise
+    params = {"limit": limit}
+    return fetch_from_geckoterminal(f"/networks/{network}/trending_pools", params)
 
-# Additional endpoints from previous implementation can be added here
+@app.get("/networks/{network}/tokens/{token_address}")
+def get_token_details(network: str, token_address: str):
+    """
+    Get specific token details on a network
+    """
+    return fetch_from_geckoterminal(f"/networks/{network}/tokens/{token_address}")
+
+@app.get("/simple/networks/{network}/token_price/{addresses}")
+def get_token_prices(
+    network: str, 
+    addresses: str
+):
+    """
+    Get current USD prices of multiple tokens on a network
+    """
+    return fetch_from_geckoterminal(f"/simple/networks/{network}/token_price/{addresses}")
+
+@app.get("/search/pools")
+def search_pools(
+    query: str = Query(..., description="Search query for pools"),
+    limit: Optional[int] = Query(10, description="Number of results to return")
+):
+    """
+    Search for pools
+    """
+    params = {
+        "query": query,
+        "limit": limit
+    }
+    return fetch_from_geckoterminal("/search/pools", params)
 
 # Run the server
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8089))  # Use PORT from environment or default to 8089
+    port = int(os.getenv("PORT", 8089))
     host = os.getenv("HOST", "0.0.0.0")
     
-    print(f"🚀 Starting GeckoTerminal API server on {host}:{port}")
+    print(f"🚀 Starting GeckoTerminal API Wrapper on {host}:{port}")
     
     uvicorn.run(
         "main:app", 
         host=host, 
         port=port, 
-        reload=True  # Enable auto-reload for development
+        reload=True
     )
