@@ -166,6 +166,6 @@ async def get_supported_networks(
 
 # Run the server
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8087))  # Using port 8087 to avoid conflicts with other APIs
+    port = int(os.getenv("PORT", 8089))  # Using port 8087 to avoid conflicts with other APIs
     print(f"🚀 Starting GeckoTerminal API server on port {port}...")
     uvicorn.run(app, host="0.0.0.0", port=port)
